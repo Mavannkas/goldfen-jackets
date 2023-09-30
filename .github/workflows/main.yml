@@ -1,4 +1,4 @@
-name: Deploy TakeCert backend
+name: Deploy hackathon backend
 
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION : "eu-central-1"
+  AWS_REGION : "eu-west-1"
 
 permissions:
   id-token: write   # This is required for requesting the JWT
@@ -31,3 +31,5 @@ jobs:
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
       - run: aws s3 ls
+      - run: java --version
+      - run: mvn --version
