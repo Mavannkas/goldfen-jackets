@@ -22,6 +22,7 @@ jobs:
   AssumeRoleAndDeployApp:
     runs-on: ubuntu-latest
     steps:
+        working-directory: ./backend
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
       - uses: aws-actions/setup-sam@v2
@@ -33,10 +34,6 @@ jobs:
       - run: aws s3 ls
       - run: java --version
       - run: mvn --version
-      - run: ls
-      - run: cd backend
-      - run: ls
-      - run: cd backend
       - run: ls
 #       - run: mvn clean package
 #       - run: mvn install
