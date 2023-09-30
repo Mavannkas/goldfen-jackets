@@ -1,0 +1,26 @@
+input QueryInput {
+    number:Int
+}
+
+type QueryResult @aws_api_key {
+    numbers:[Int]
+}
+
+type MutationResult @aws_api_key {
+    numbers:[Int]
+}
+
+type Query {
+    query:QueryResult
+    @aws_api_key
+}
+
+type Mutation {
+    mutation(number:Int): MutationResult
+    @aws_api_key
+}
+
+schema {
+    query:Query
+    mutation:Mutation
+}

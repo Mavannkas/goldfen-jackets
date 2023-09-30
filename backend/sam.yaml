@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Hackathon-Stack
+
+Resources:
+
+  HackathonApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      AuthenticationType: API_KEY
+      Name: 'Hackathon-Api'
+      LogConfig:
+        CloudWatchLogsRoleArn: !GetAtt HackathonServiceRole.Arn
+        FieldLogLevel: 'ALL'
+
+  HackathonApiSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt HackathonApi.ApiId
+      DefinitionS3Location: schema.graphql
+
+  HackathonLambdaDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      Name: HackathonLambdaDataSource
+      Type: AWS_LAMBDA
+      ApiId: !GetAtt HackathonApi.ApiId
+      Description: Hackathon DataSource
+      ServiceRoleArn: !GetAtt HackathonServiceRole.Arn
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt HackathonFunction.Arn
+
+  HackathonFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: target/lambda.jar
+      Handler: org.example.handlers.POCHandler::handleRequest
+      Runtime: java11
+      Timeout: 30
+      MemorySize: 2048
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  QueryPipelineResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt HackathonApi.ApiId
+      TypeName: Query
+      FieldName: "query"
+      # language=VTL
+      RequestMappingTemplate: |
+        $util.qr($ctx.stash.put("args", $ctx.args))
+        $util.qr($ctx.stash.put("operation_type", "QUERY"))
+        {}
+      # language=VTL
+      ResponseMappingTemplate: |
+        $util.toJson($context.result)
+      Kind: "PIPELINE"
+      PipelineConfig:
+        Functions:
+          - !GetAtt HackathonPipelineFunction.FunctionId
+
+  MutationPipelineResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt HackathonApi.ApiId
+      TypeName: Mutation
+      FieldName: "mutation"
+      # language=VTL
+      RequestMappingTemplate: |
+        $util.qr($ctx.stash.put("args", $ctx.args))
+        $util.qr($ctx.stash.put("operation_type", "MUTATION"))
+        {}
+      # language=VTL
+      ResponseMappingTemplate: |
+        $util.toJson($context.result)
+      Kind: "PIPELINE"
+      PipelineConfig:
+        Functions:
+          - !GetAtt HackathonPipelineFunction.FunctionId
+
+  HackathonPipelineFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt HackathonApi.ApiId
+      Name: "HackathonPipelineFunction"
+      Description: "Hackathon pipeline function"
+      DataSourceName: !GetAtt HackathonLambdaDataSource.Name
+      # language=VTL
+      RequestMappingTemplate: |
+        {
+            "version": "2017-02-28",
+            "operation": "Invoke",
+            "payload": {
+                "number": $util.toJson($ctx.stash.args.number),
+                "operationType": $util.toJson($ctx.stash.operation_type)
+            }
+        }
+      # language=VTL
+      ResponseMappingTemplate: |
+        #foreach($error in $ctx.result.errors)
+          $util.appendError("${error.message}", $error.type, "", $error.errorCode)
+        #end
+        $util.toJson($ctx.result.response)
+      FunctionVersion: "2018-05-29"
+
+  HackathonServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -   Effect: Allow
+              Principal:
+                Service:
+                  - appsync.amazonaws.com
+              Action:
+                - sts:AssumeRole
+
+  HackathonLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Policy for logging
+      Roles:
+        - !Ref HackathonServiceRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:*
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogStream'
+              - 'logs:CreateLogGroup'
+              - 'logs:PutLogEvents'
+            Resource:
+              - '*'
