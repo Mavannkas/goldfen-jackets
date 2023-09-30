@@ -33,3 +33,5 @@ jobs:
       - run: aws s3 ls
       - run: java --version
       - run: mvn --version
+      - run: mvn clean package
+      - run: mvn install
